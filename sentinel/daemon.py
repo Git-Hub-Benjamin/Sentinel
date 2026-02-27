@@ -17,6 +17,7 @@ from typing import Optional
 
 from .config import load_config, SOCKET_PATH, STATE_FILE
 from .watchdog import Watchdog
+from .api import start_api_server
 
 logging.basicConfig(
     level=logging.INFO,
@@ -221,6 +222,10 @@ class SentinelDaemon:
 
         signal.signal(signal.SIGTERM, shutdown)
         signal.signal(signal.SIGINT, shutdown)
+
+        # Start HTTP API if enabled
+        if self.config.web.enabled:
+            start_api_server(self, self.config.web.host, self.config.web.port)
 
         # Start socket server (blocks until shutdown)
         self._socket_server()

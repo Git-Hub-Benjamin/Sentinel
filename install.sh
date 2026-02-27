@@ -32,33 +32,52 @@ mkdir -p /etc/sentinel
 if [[ ! -f /etc/sentinel/config.toml ]]; then
     cat > /etc/sentinel/config.toml << 'EOF'
 [inference]
-service = "tgi"
+service = "ollama"
 restart_delay = 5
 
 [watchdog]
 poll_interval = 5
-ignored_processes = ["Xorg", "gnome-shell", "plasmashell"]
+owner_user = "benjamin"
 
 [web]
-enabled = false
+enabled = true
 port = 8765
+host = "0.0.0.0"
 EOF
     echo "[sentinel] Created default config at /etc/sentinel/config.toml"
 else
     echo "[sentinel] Config already exists, skipping."
 fi
 
+echo "[sentinel] Configuring Ollama for multi-model concurrent inference..."
+OLLAMA_OVERRIDE="/etc/systemd/system/ollama.service.d"
+mkdir -p $OLLAMA_OVERRIDE
+cat > $OLLAMA_OVERRIDE/sentinel.conf << 'EOF'
+[Service]
+Environment="OLLAMA_MAX_LOADED_MODELS=4"
+Environment="OLLAMA_NUM_PARALLEL=8"
+EOF
+echo "  ✓ Set OLLAMA_MAX_LOADED_MODELS=4, OLLAMA_NUM_PARALLEL=8"
+
 echo "[sentinel] Installing systemd service..."
 cp sentinel.service /etc/systemd/system/sentinel.service
 systemctl daemon-reload
 systemctl enable sentinel
+systemctl restart ollama
 systemctl start sentinel
 
 echo ""
 echo "[sentinel] Installation complete!"
-echo "  Sentinel venv: $VENV_PATH"
-echo "  Config: /etc/sentinel/config.toml"
-echo "  Status: sentinel-status"
+echo "  Sentinel venv:  $VENV_PATH"
+echo "  Config:         /etc/sentinel/config.toml"
+echo "  Status:         sentinel-status"
+echo "  Monitor:        sentinel-monitor"
 echo "  Wrap workloads: sentinel-request python your_script.py"
-echo "  Logs: journalctl -u sentinel -f"
+echo "  HTTP API:       http://$(hostname):8765/capacity"
+echo "  Ollama proxy:   http://$(hostname):8765/v1/  (OpenAI-compatible)"
+echo "  Logs:           journalctl -u sentinel -f"
+echo ""
+echo "  OpenClaw config:"
+echo "    baseUrl: \"http://$(hostname):8765/v1\""
+echo "    api:     \"openai-responses\""
 echo ""

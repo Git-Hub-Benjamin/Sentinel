@@ -36,6 +36,7 @@ class WatchdogConfig:
 class WebConfig:
     enabled: bool = True
     port: int = 8765
+    host: str = "0.0.0.0"
 
 @dataclass
 class Config:
