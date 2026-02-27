@@ -89,6 +89,14 @@ class SentinelDaemon:
         with self._lock:
             self.lock_count = max(0, self.lock_count - 1)
             if self.lock_count == 0 and self.state == State.RESEARCH:
+                # Don't resume if guests are still connected
+                from .watchdog import get_guest_sessions
+                guests = get_guest_sessions(self.ssh_sessions, self.config.watchdog.owner_user)
+                if guests:
+                    guest_users = {s["user"] for s in guests}
+                    self.lock_holder = f"ssh:{','.join(sorted(guest_users))}"
+                    self._write_state()
+                    return {"ok": True, "message": f"Lock released but guests still connected: {guest_users}"}
                 self.state = State.IDLE
                 self.lock_holder = None
                 self.lock_since = None
