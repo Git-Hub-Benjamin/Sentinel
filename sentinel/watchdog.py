@@ -28,28 +28,23 @@ def get_ssh_sessions() -> List[Dict[str, str]]:
             line = line.strip()
             if not line:
                 continue
-            # Format: username tty (host) time
-            # Example: benjamin  pts/0    2026-02-26 18:49
-            # Example: cole      pts/1    (10.0.0.22) 2026-02-26 18:50
+            # Format: username tty date time [from]
+            # Example: benjamin pts/13 2026-02-26 18:48 (144.39.201.185)
+            # Example: mark     pts/6  2026-02-26 08:31
             parts = line.split()
             if len(parts) >= 2:
                 user = parts[0]
                 tty = parts[1]
                 # Only include remote TTYs (pts/*)
                 if tty.startswith("pts/"):
-                    # Extract remote host if present
+                    # Extract remote host if present (at the end in parens)
                     from_host = ""
                     time_str = ""
                     if len(parts) >= 4:
-                        # If third part is in parens, it's the host
-                        if parts[2].startswith("(") and parts[2].endswith(")"):
-                            from_host = parts[2].strip("()")
-                            if len(parts) >= 5:
-                                time_str = " ".join(parts[3:])
-                        else:
-                            from_host = parts[2]
-                            if len(parts) >= 4:
-                                time_str = " ".join(parts[3:])
+                        time_str = f"{parts[2]} {parts[3]}"  # date + time
+                        if len(parts) >= 5:
+                            # Last part is the from field (in parens)
+                            from_host = parts[4].strip("()")
                     sessions.append({
                         "user": user,
                         "tty": tty,
