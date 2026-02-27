@@ -27,12 +27,13 @@ def get_daemon_status() -> dict:
     """Query daemon for current status via Unix socket."""
     try:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.settimeout(3)
         sock.connect(SOCKET_PATH)
         sock.sendall(json.dumps({"cmd": "status"}).encode())
         data = sock.recv(4096).decode()
         sock.close()
         return json.loads(data)
-    except (FileNotFoundError, ConnectionRefusedError, json.JSONDecodeError):
+    except Exception:
         return None
 
 

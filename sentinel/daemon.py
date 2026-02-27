@@ -39,7 +39,7 @@ class SentinelDaemon:
         self.lock_since: Optional[str] = None
         self.lock_count = 0  # reference count — multiple research processes can stack
         self.ssh_sessions: list = []
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._running = False
 
     # ------------------------------------------------------------------ #
