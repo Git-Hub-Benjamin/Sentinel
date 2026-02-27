@@ -38,6 +38,7 @@ class SentinelDaemon:
         self.lock_holder: Optional[str] = None
         self.lock_since: Optional[str] = None
         self.lock_count = 0  # reference count — multiple research processes can stack
+        self.ssh_sessions: list = []
         self._lock = threading.Lock()
         self._running = False
 
@@ -96,15 +97,15 @@ class SentinelDaemon:
                 return {"ok": True, "message": "GPU released, resuming inference"}
             return {"ok": True, "message": f"Lock released (remaining count={self.lock_count})"}
 
-    def force_pause(self, procs: set) -> dict:
-        """Called by watchdog when unauthorized CUDA usage detected."""
+    def force_pause(self, holders: set) -> dict:
+        """Called by watchdog when SSH guests detected."""
         with self._lock:
             if self.state == State.IDLE:
                 self.state = State.RESEARCH
-                self.lock_holder = f"watchdog:{','.join(procs)}"
+                self.lock_holder = f"ssh:{','.join(sorted(holders))}"
                 self.lock_since = datetime.now().isoformat()
                 self._write_state()
-                threading.Thread(target=self.pause_inference, args=("watchdog detection",), daemon=True).start()
+                threading.Thread(target=self.pause_inference, args=("ssh watchdog detection",), daemon=True).start()
         return {"ok": True}
 
     def force_free(self) -> dict:
@@ -127,6 +128,8 @@ class SentinelDaemon:
                 "lock_count": self.lock_count,
                 "inference_service": self.config.inference.service,
                 "inference_running": self._service_running(),
+                "ssh_sessions": self.ssh_sessions,
+                "owner_user": self.config.watchdog.owner_user,
             }
 
     def _write_state(self):
@@ -194,9 +197,10 @@ class SentinelDaemon:
         # Start watchdog
         watchdog = Watchdog(
             poll_interval=self.config.watchdog.poll_interval,
-            ignored_processes=self.config.watchdog.ignored_processes,
-            on_taken=lambda source, procs: self.force_pause(procs),
+            owner_user=self.config.watchdog.owner_user,
+            on_taken=lambda source, users: self.force_pause(users),
             on_free=lambda source: self.force_free(),
+            on_sessions_update=lambda sessions: setattr(self, 'ssh_sessions', sessions),
         )
         wt = threading.Thread(target=watchdog.run, daemon=True)
         wt.start()

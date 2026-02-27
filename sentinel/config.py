@@ -30,7 +30,7 @@ class InferenceConfig:
 @dataclass
 class WatchdogConfig:
     poll_interval: int = 5
-    ignored_processes: List[str] = field(default_factory=lambda: ["Xorg", "gnome-shell", "plasmashell"])
+    owner_user: str = "benjamin"
 
 @dataclass
 class WebConfig:
@@ -52,7 +52,9 @@ def load_config(path: str = DEFAULT_CONFIG_PATH) -> Config:
     if "inference" in raw:
         cfg.inference = InferenceConfig(**raw["inference"])
     if "watchdog" in raw:
-        cfg.watchdog = WatchdogConfig(**raw["watchdog"])
+        known = {k: v for k, v in raw["watchdog"].items()
+                 if k in ("poll_interval", "owner_user")}
+        cfg.watchdog = WatchdogConfig(**known)
     if "web" in raw:
         cfg.web = WebConfig(**raw["web"])
     return cfg
